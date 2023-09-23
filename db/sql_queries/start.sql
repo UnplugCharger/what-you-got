@@ -1,7 +1,7 @@
 -- name: CreateUser :one
 INSERT INTO users (first_name, last_name, email, password)
 VALUES ($1, $2, $3, $4)
-RETURNING user_id, first_name, last_name, email, date_joined;
+RETURNING *;
 
 -- name: GetUserByEmail :one
 SELECT user_id, first_name, last_name, email, date_joined

@@ -56,7 +56,7 @@ func (q *Queries) CreateRawReceipt(ctx context.Context, arg CreateRawReceiptPara
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (first_name, last_name, email, password)
 VALUES ($1, $2, $3, $4)
-RETURNING user_id, first_name, last_name, email, date_joined
+RETURNING user_id, first_name, last_name, email, password, date_joined
 `
 
 type CreateUserParams struct {
@@ -66,27 +66,20 @@ type CreateUserParams struct {
 	Password  string `json:"password"`
 }
 
-type CreateUserRow struct {
-	UserID     int32              `json:"user_id"`
-	FirstName  string             `json:"first_name"`
-	LastName   string             `json:"last_name"`
-	Email      string             `json:"email"`
-	DateJoined pgtype.Timestamptz `json:"date_joined"`
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.FirstName,
 		arg.LastName,
 		arg.Email,
 		arg.Password,
 	)
-	var i CreateUserRow
+	var i User
 	err := row.Scan(
 		&i.UserID,
 		&i.FirstName,
 		&i.LastName,
 		&i.Email,
+		&i.Password,
 		&i.DateJoined,
 	)
 	return i, err

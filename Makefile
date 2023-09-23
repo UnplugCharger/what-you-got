@@ -22,3 +22,6 @@ sqlc:
 
 new_migration:
 	migrate create -ext sql -dir db/migrations -seq $(name)
+
+server:
+	go run main.go
