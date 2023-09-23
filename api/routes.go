@@ -1,14 +1,16 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
+	"github.com/rs/zerolog/log"
 	db "hackathon/db/sqlc"
 	"hackathon/utils"
 	"mime/multipart"
 	"net/http"
-	"os"
+	"regexp"
 	"strconv"
 )
 
@@ -101,7 +103,7 @@ func (server *Server) processReceipt(ctx *gin.Context) {
 	}
 
 	// Ensure the file is deleted after processing
-	defer os.Remove(imagePath)
+	//defer os.Remove(imagePath)
 
 	// Process the image using OCR
 	extractedText, err := utils.ProcessReceiptImage(imagePath)
@@ -115,10 +117,62 @@ func (server *Server) processReceipt(ctx *gin.Context) {
 		OcrText: extractedText,
 	}
 
+	// pass this to gpt to jsonify it well
 	rawReceipt, err := server.store.CreateRawReceipt(ctx, args)
-	fmt.Println(rawReceipt)
+	//fmt.Println(rawReceipt)
+
+	structured, err := utils.ExtractReceiptInfo(rawReceipt.OcrText)
+	if err != nil {
+		log.Print(err)
+	}
+
+	fmt.Println(structured)
+
+	// Convert the structured map to a JSON string
+	jsonBytes, err := json.Marshal(structured)
+	if err != nil {
+		// Handle the error
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to convert structured data to JSON"})
+		return
+	}
+
+	// If you need the JSON as a string
+	//jsonString := string(jsonBytes)
+
+	args2 := db.CreateProcessedReceiptParams{
+		ReceiptID: &rawReceipt.ReceiptID,
+		UserID:    &ID,
+		Data:      jsonBytes,
+	}
+
+	digitised, err := server.store.CreateProcessedReceipt(ctx, args2)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, fmt.Sprintf("Failed to process the receipt text: %s", err.Error()))
+	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"extracted_text": extractedText,
+		"rawReceipt":     rawReceipt,
+		"extracted_text": cleanText(rawReceipt.OcrText),
+		"digitised":      digitised,
 	})
+
+	// Ensure the file is deleted after processing
+	//defer os.Remove(imagePath)
+}
+
+func cleanText(input string) string {
+	// Replace multiple whitespaces with a single space
+	re := regexp.MustCompile(`[\s]+`)
+	cleaned := re.ReplaceAllString(input, " ")
+
+	// Structure the address for better readability
+	addressPattern := `(?i)(Shipping Address:|amazoncomau TAX INVOICE|Order Number:|Order Date:|Event-Driven Architecture)`
+	addressRepl := "\n\n$1 "
+	re = regexp.MustCompile(addressPattern)
+	cleaned = re.ReplaceAllString(cleaned, addressRepl)
+
+	// Remove unwanted characters
+	cleaned = regexp.MustCompile(`\f`).ReplaceAllString(cleaned, "")
+
+	return cleaned
 }

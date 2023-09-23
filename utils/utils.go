@@ -32,7 +32,7 @@ func ProcessReceiptImage(imagePath string) (string, error) {
 }
 
 const openAIEndpoint = "https://api.openai.com/v1/engines/davinci/completions"
-const apiKey = "fsshjsdhkyekwbd"
+const apiKey = ""
 
 // RequestPayload defines the request structure for OpenAI's API
 type RequestPayload struct {
